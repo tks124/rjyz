@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高级人机验证</title>
+    <title>124人机验证</title>
     <style>
         body {
             display: flex;
@@ -105,6 +105,22 @@
 </div>
 
 <script>
+    // ==========================================
+    // 🔒 1. 验证拦截逻辑 (放在最前面)
+    // ==========================================
+    const AUTH_KEY = "sk124_auth_token";
+    const AUTH_PAGE_URL = "https://tks124.github.io/tks/";
+
+    window.onload = function() {
+        if (localStorage.getItem(AUTH_KEY) !== "true") {
+            window.location.replace(AUTH_PAGE_URL);
+        } else {
+            // 验证通过后，再执行页面原有的加载逻辑
+            initCaptcha();
+        }
+    };
+    // ==========================================
+
     let nextTarget = 1;
     const totalDots = 5;
     let currentRound = 1;
@@ -250,10 +266,6 @@
             setTimeout(initCaptcha, 800);
         }
     }
-
-    window.onload = function() {
-        initCaptcha();
-    };
 </script>
 
 </body>
