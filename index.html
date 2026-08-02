@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级人机验证</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+        }
+
+        .captcha-container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 360px;
+        }
+
+        h2 { margin-top: 0; color: #333; font-size: 20px; }
+        .instruction { color: #666; font-size: 14px; margin-bottom: 20px; }
+
+        .captcha-box {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            background-color: #e9ecef;
+            border: 2px dashed #ced4da;
+            border-radius: 8px;
+            margin: 0 auto 20px;
+            overflow: hidden;
+        }
+
+        .target-dot {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 16px;
+            user-select: none;
+            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+
+        .target-dot:hover { transform: scale(1.1); }
+        .target-dot.clicked { background-color: #28a745; cursor: default; pointer-events: none; }
+        .target-dot.wrong { background-color: #dc3545; animation: shake 0.4s; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .btn-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover { background-color: #0056b3; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover { background-color: #5a6268; }
+
+        .status-msg { margin-top: 15px; font-size: 14px; height: 20px; font-weight: bold; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+
+<div class="captcha-container">
+    <h2>安全验证</h2>
+    <p class="instruction" id="instructionText">请按照从小到大的顺序，依次点击数字</p>
+    
+    <div class="captcha-box" id="captchaBox"></div>
+
+    <div class="btn-group">
+        <button class="btn" onclick="initCaptcha()">刷新</button>
+        <button class="btn btn-secondary" onclick="handleNotFound()">未找到有顺序的数字</button>
+    </div>
+    
+    <div class="status-msg" id="statusMsg"></div>
+</div>
+
+<script>
+    let nextTarget = 1;
+    const totalDots = 5;
+    let currentRound = 1;
+    let isRealSequence = false;
+    const redirectUrl = "https://tks124.github.io/Space-Kill-124/";
+    const delaySeconds = 3;
+
+    // 防重叠：生成一个不与已有位置冲突的坐标
+    function getNonOverlappingPosition(existingPositions, boxWidth, boxHeight, dotSize, minGap) {
+        let x, y, overlapping;
+        let attempts = 0;
+        const maxAttempts = 200; // 防止死循环
+
+        do {
+            overlapping = false;
+            x = Math.floor(Math.random() * (boxWidth - dotSize));
+            y = Math.floor(Math.random() * (boxHeight - dotSize));
+
+            // 检查与所有已放置圆点的距离
+            for (let pos of existingPositions) {
+                const dx = x - pos.x;
+                const dy = y - pos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < minGap) {
+                    overlapping = true;
+                    break;
+                }
+            }
+            attempts++;
+        } while (overlapping && attempts < maxAttempts);
+
+        return { x, y };
+    }
+
+    function initCaptcha() {
+        const box = document.getElementById('captchaBox');
+        const statusMsg = document.getElementById('statusMsg');
+        const instruction = document.getElementById('instructionText');
+        
+        box.innerHTML = '';
+        statusMsg.innerText = '';
+        statusMsg.className = 'status-msg';
+        nextTarget = 1;
+
+        if (currentRound === 2) {
+            isRealSequence = true;
+            instruction.innerText = "最终验证：请按顺序点击 1-5";
+        } else {
+            isRealSequence = Math.random() > 0.5;
+            instruction.innerText = "请按照从小到大的顺序，依次点击数字";
+        }
+
+        const dotSize = 36;
+        const boxWidth = box.offsetWidth;
+        const boxHeight = box.offsetHeight;
+        const minGap = 50; // 圆点之间最小间距（像素）
+
+        let numbers = [];
+        if (isRealSequence) {
+            numbers = [1, 2, 3, 4, 5];
+        } else {
+            while (numbers.length < 5) {
+                let r = Math.floor(Math.random() * 20) + 1;
+                if (!numbers.includes(r)) {
+                    numbers.push(r);
+                }
+            }
+        }
+
+        // 逐个放置，每次检查是否与已放置的冲突
+        const placedPositions = [];
+
+        numbers.forEach(num => {
+            const pos = getNonOverlappingPosition(placedPositions, boxWidth, boxHeight, dotSize, minGap);
+            placedPositions.push(pos);
+
+            const dot = document.createElement('div');
+            dot.className = 'target-dot';
+            dot.innerText = num;
+            dot.style.left = `${pos.x}px`;
+            dot.style.top = `${pos.y}px`;
+            dot.dataset.value = num;
+
+            dot.addEventListener('click', function() {
+                handleClick(this);
+            });
+
+            box.appendChild(dot);
+        });
+    }
+
+    function handleClick(dotElement) {
+        if (!isRealSequence) {
+            dotElement.classList.add('wrong');
+            document.getElementById('statusMsg').innerText = '❌ 这些数字没有顺序！';
+            document.getElementById('statusMsg').className = 'status-msg error';
+            setTimeout(initCaptcha, 800);
+            return;
+        }
+
+        const clickedValue = parseInt(dotElement.dataset.value);
+        const statusMsg = document.getElementById('statusMsg');
+
+        if (clickedValue === nextTarget) {
+            dotElement.classList.add('clicked');
+            nextTarget++;
+
+            if (nextTarget > totalDots) {
+                if (currentRound === 1) {
+                    statusMsg.innerText = '✅ 第一轮通过！正在进行最终验证...';
+                    statusMsg.className = 'status-msg success';
+                    currentRound = 2;
+                    setTimeout(initCaptcha, 1000);
+                } else {
+                    statusMsg.innerText = `✅ 验证成功！${delaySeconds}秒后跳转...`;
+                    statusMsg.className = 'status-msg success';
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, delaySeconds * 1000);
+                }
+            }
+        } else {
+            dotElement.classList.add('wrong');
+            statusMsg.innerText = '❌ 顺序错误，请重试';
+            statusMsg.className = 'status-msg error';
+            setTimeout(initCaptcha, 800);
+        }
+    }
+
+    function handleNotFound() {
+        const statusMsg = document.getElementById('statusMsg');
+        
+        if (!isRealSequence) {
+            if (currentRound === 1) {
+                statusMsg.innerText = '✅ 判断正确！正在进行最终验证...';
+                statusMsg.className = 'status-msg success';
+                currentRound = 2;
+                setTimeout(initCaptcha, 1000);
+            }
+        } else {
+            statusMsg.innerText = '❌ 明明有顺序，请仔细检查！';
+            statusMsg.className = 'status-msg error';
+            setTimeout(initCaptcha, 800);
+        }
+    }
+
+    window.onload = function() {
+        initCaptcha();
+    };
+</script>
+
+</body>
+</html>
