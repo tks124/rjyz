@@ -92,7 +92,7 @@
 
 <div class="captcha-container">
     <h2>安全验证</h2>
-    <p class="instruction" id="instructionText">请按照从小到大的顺序，依次点击数字</p>
+    <p class="instruction" id="instructionText">请按照从小到大的顺序，依次点击数字</p >
     
     <div class="captcha-box" id="captchaBox"></div>
 
@@ -105,21 +105,54 @@
 </div>
 
 <script>
-    // ==========================================
-    // 🔒 1. 验证拦截逻辑 (放在最前面)
-    // ==========================================
     const AUTH_KEY = "sk124_auth_token";
     const AUTH_PAGE_URL = "https://tks124.github.io/tks/";
+
+    const WHITELIST_DOMAINS = [
+        'bilibili.com',
+        'foxmail.com'
+    ];
+
+    function isWhitelisted(url) {
+        if (url.startsWith('mailto:')) {
+            return true;
+        }
+        try {
+            const urlObj = new URL(url);
+            return WHITELIST_DOMAINS.some(domain => urlObj.hostname.includes(domain));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function navigateWithSafetyCheck(url) {
+        if (!url || url === '#') {
+            return;
+        }
+
+        if (isWhitelisted(url)) {
+            window.location.href = url;
+            return;
+        }
+
+        if (url.startsWith("https://tks124.github.io/")) {
+            window.location.replace(url);
+            return;
+        }
+
+        const isConfirmed = confirm("当前前往的网站并非Space Kill 124名下，注意隐私安全。");
+        if (isConfirmed) {
+            window.location.href = url;
+        }
+    }
 
     window.onload = function() {
         if (localStorage.getItem(AUTH_KEY) !== "true") {
             window.location.replace(AUTH_PAGE_URL);
         } else {
-            // 验证通过后，再执行页面原有的加载逻辑
             initCaptcha();
         }
     };
-    // ==========================================
 
     let nextTarget = 1;
     const totalDots = 5;
@@ -128,18 +161,16 @@
     const redirectUrl = "https://tks124.github.io/Space-Kill-124/";
     const delaySeconds = 3;
 
-    // 防重叠：生成一个不与已有位置冲突的坐标
     function getNonOverlappingPosition(existingPositions, boxWidth, boxHeight, dotSize, minGap) {
         let x, y, overlapping;
         let attempts = 0;
-        const maxAttempts = 200; // 防止死循环
+        const maxAttempts = 200;
 
         do {
             overlapping = false;
             x = Math.floor(Math.random() * (boxWidth - dotSize));
             y = Math.floor(Math.random() * (boxHeight - dotSize));
 
-            // 检查与所有已放置圆点的距离
             for (let pos of existingPositions) {
                 const dx = x - pos.x;
                 const dy = y - pos.y;
@@ -176,7 +207,7 @@
         const dotSize = 36;
         const boxWidth = box.offsetWidth;
         const boxHeight = box.offsetHeight;
-        const minGap = 50; // 圆点之间最小间距（像素）
+        const minGap = 50;
 
         let numbers = [];
         if (isRealSequence) {
@@ -190,7 +221,6 @@
             }
         }
 
-        // 逐个放置，每次检查是否与已放置的冲突
         const placedPositions = [];
 
         numbers.forEach(num => {
@@ -238,7 +268,7 @@
                     statusMsg.innerText = `✅ 验证成功！${delaySeconds}秒后跳转...`;
                     statusMsg.className = 'status-msg success';
                     setTimeout(() => {
-                        window.location.href = redirectUrl;
+                        navigateWithSafetyCheck(redirectUrl);
                     }, delaySeconds * 1000);
                 }
             }
@@ -261,7 +291,7 @@
                 setTimeout(initCaptcha, 1000);
             }
         } else {
-            statusMsg.innerText = '❌ 明明有顺序，请仔细检查！';
+            statusMsg.innerText = '❌ 有12345，请仔细检查！';
             statusMsg.className = 'status-msg error';
             setTimeout(initCaptcha, 800);
         }
