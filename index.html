@@ -86,31 +86,110 @@
         .status-msg { margin-top: 15px; font-size: 14px; height: 20px; font-weight: bold; }
         .success { color: #28a745; }
         .error { color: #dc3545; }
+
+        .lang-switch {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .lang-switch:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
 
+<button class="lang-switch" id="langBtn">English</button>
+
 <div class="captcha-container">
-    <h2>安全验证</h2>
-    <p class="instruction" id="instructionText">请按照从小到大的顺序，依次点击数字</p >
-    
+    <h2 id="titleText">安全验证</h2>
+    <p class="instruction" id="instructionText">请按照从小到大的顺序，依次点击数字</p>
+
     <div class="captcha-box" id="captchaBox"></div>
 
     <div class="btn-group">
-        <button class="btn btn-secondary" onclick="handleNotFound()">未找到1-2-3-4-5</button>
+        <button class="btn btn-secondary" id="notFoundBtn" onclick="handleNotFound()">未找到1-2-3-4-5</button>
     </div>
-    
+
     <div class="status-msg" id="statusMsg"></div>
 </div>
 
 <script>
     const AUTH_KEY = "sk124_auth_token";
     const AUTH_PAGE_URL = "https://tks124.github.io/tks/";
+    const LANG_KEY = "sk124_lang";
 
     const WHITELIST_DOMAINS = [
         'bilibili.com',
         'foxmail.com'
     ];
+
+    const translations = {
+        zh: {
+            pageTitle: "124人机验证",
+            title: "安全验证",
+            instructionNormal: "请按照从小到大的顺序，依次点击数字",
+            instructionFinal: "最终验证：请按顺序点击 1-5",
+            notFoundBtn: "未找到1-2-3-4-5",
+            errNotSequence: "❌ 这些数字没有顺序！",
+            passRound1: "✅ 第一轮通过！正在进行最终验证...",
+            successRedirect: "✅ 验证成功！{n}秒后跳转...",
+            errWrongOrder: "❌ 顺序错误，请重试",
+            passFinal: "✅ 判断正确！正在进行最终验证...",
+            errHasSequence: "❌ 有12345，请仔细检查！",
+            safetyAlert: "当前前往的网站并非Space Kill 124名下，注意隐私安全。",
+            langBtn: "English"
+        },
+        en: {
+            pageTitle: "124 CAPTCHA Verification",
+            title: "Security Verification",
+            instructionNormal: "Please click the numbers in ascending order",
+            instructionFinal: "Final step: click 1-5 in order",
+            notFoundBtn: "No 1-2-3-4-5 found",
+            errNotSequence: "❌ These numbers are not in order!",
+            passRound1: "✅ Round 1 passed! Proceeding to the final verification...",
+            successRedirect: "✅ Verification successful! Redirecting in {n} seconds...",
+            errWrongOrder: "❌ Wrong order, please try again",
+            passFinal: "✅ Correct! Proceeding to the final verification...",
+            errHasSequence: "❌ 1-2-3-4-5 is present, please look carefully!",
+            safetyAlert: "The site you are about to visit is not owned by SpaceKill124. Please pay attention to your privacy and security.",
+            langBtn: "中文"
+        }
+    };
+
+    let currentLang = localStorage.getItem(LANG_KEY) || 'zh';
+    let currentInstructionKey = 'instructionNormal';
+    let captchaInitialized = false;
+
+    function t(key) {
+        return translations[currentLang][key] || key;
+    }
+
+    function updateText() {
+        document.title = t('pageTitle');
+        document.getElementById('titleText').innerText = t('title');
+        document.getElementById('notFoundBtn').innerText = t('notFoundBtn');
+        document.getElementById('instructionText').innerText = t(currentInstructionKey);
+        document.getElementById('langBtn').innerText = t('langBtn');
+    }
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'zh' ? 'en' : 'zh';
+        localStorage.setItem(LANG_KEY, currentLang);
+        updateText();
+        // 若验证码已经渲染，重新绘制一次，保证里面没有残留的旧语言文本
+        if (captchaInitialized) {
+            initCaptcha();
+        }
+    }
+
+    document.getElementById('langBtn').addEventListener('click', toggleLanguage);
 
     function isWhitelisted(url) {
         if (url.startsWith('mailto:')) {
@@ -139,16 +218,18 @@
             return;
         }
 
-        const isConfirmed = confirm("当前前往的网站并非Space Kill 124名下，注意隐私安全。");
+        const isConfirmed = confirm(t('safetyAlert'));
         if (isConfirmed) {
             window.location.href = url;
         }
     }
 
     window.onload = function() {
+        updateText();
         if (localStorage.getItem(AUTH_KEY) !== "true") {
             window.location.replace(AUTH_PAGE_URL);
         } else {
+            captchaInitialized = true;
             initCaptcha();
         }
     };
@@ -189,7 +270,7 @@
         const box = document.getElementById('captchaBox');
         const statusMsg = document.getElementById('statusMsg');
         const instruction = document.getElementById('instructionText');
-        
+
         box.innerHTML = '';
         statusMsg.innerText = '';
         statusMsg.className = 'status-msg';
@@ -197,11 +278,12 @@
 
         if (currentRound === 2) {
             isRealSequence = true;
-            instruction.innerText = "最终验证：请按顺序点击 1-5";
+            currentInstructionKey = 'instructionFinal';
         } else {
             isRealSequence = Math.random() > 0.5;
-            instruction.innerText = "请按照从小到大的顺序，依次点击数字";
+            currentInstructionKey = 'instructionNormal';
         }
+        instruction.innerText = t(currentInstructionKey);
 
         const dotSize = 36;
         const boxWidth = box.offsetWidth;
@@ -244,7 +326,7 @@
     function handleClick(dotElement) {
         if (!isRealSequence) {
             dotElement.classList.add('wrong');
-            document.getElementById('statusMsg').innerText = '❌ 这些数字没有顺序！';
+            document.getElementById('statusMsg').innerText = t('errNotSequence');
             document.getElementById('statusMsg').className = 'status-msg error';
             setTimeout(initCaptcha, 800);
             return;
@@ -259,12 +341,12 @@
 
             if (nextTarget > totalDots) {
                 if (currentRound === 1) {
-                    statusMsg.innerText = '✅ 第一轮通过！正在进行最终验证...';
+                    statusMsg.innerText = t('passRound1');
                     statusMsg.className = 'status-msg success';
                     currentRound = 2;
                     setTimeout(initCaptcha, 1000);
                 } else {
-                    statusMsg.innerText = `✅ 验证成功！${delaySeconds}秒后跳转...`;
+                    statusMsg.innerText = t('successRedirect').replace('{n}', delaySeconds);
                     statusMsg.className = 'status-msg success';
                     setTimeout(() => {
                         navigateWithSafetyCheck(redirectUrl);
@@ -273,7 +355,7 @@
             }
         } else {
             dotElement.classList.add('wrong');
-            statusMsg.innerText = '❌ 顺序错误，请重试';
+            statusMsg.innerText = t('errWrongOrder');
             statusMsg.className = 'status-msg error';
             setTimeout(initCaptcha, 800);
         }
@@ -281,16 +363,16 @@
 
     function handleNotFound() {
         const statusMsg = document.getElementById('statusMsg');
-        
+
         if (!isRealSequence) {
             if (currentRound === 1) {
-                statusMsg.innerText = '✅ 判断正确！正在进行最终验证...';
+                statusMsg.innerText = t('passFinal');
                 statusMsg.className = 'status-msg success';
                 currentRound = 2;
                 setTimeout(initCaptcha, 1000);
             }
         } else {
-            statusMsg.innerText = '❌ 有12345，请仔细检查！';
+            statusMsg.innerText = t('errHasSequence');
             statusMsg.className = 'status-msg error';
             setTimeout(initCaptcha, 800);
         }
